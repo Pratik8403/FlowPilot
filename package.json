@@ -1,0 +1,28 @@
+{
+  "name": "flowpilot",
+  "version": "0.1.0",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "dev-renderer": "cd renderer && npm run dev",
+    "dev-electron": "wait-on tcp:5173 && electron .",
+    "start": "concurrently \"npm:dev-renderer\" \"npm:dev-electron\"",
+    "build": "electron-builder"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "electron": "^26.2.0",
+    "electron-builder": "^24.9.0",
+    "wait-on": "^7.0.1"
+  },
+  "dependencies": {
+    "active-win": "^8.2.0",
+    "fs-extra": "^11.1.1"
+  },
+  "build": {
+    "appId": "com.flowpilot.app",
+    "win": {
+      "target": "nsis"
+    }
+  }
+}

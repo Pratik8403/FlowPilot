@@ -1,0 +1,50 @@
+/* basic app styles */
+:root {
+  --bg: #0f172a;
+  --muted: #9fb0d3;
+  --card: #071129;
+  --accent: #10b981;
+  --danger: #ef4444;
+  --text: #e6eef8;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+h1 { font-size: 24px; margin-bottom: 6px; }
+
+p { margin-top: 6px; color: var(--muted); }
+
+.card {
+  background: var(--card);
+  padding: 12px;
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(2,6,23,0.6);
+}
+
+.small { font-size: 12px; color: var(--muted); }
+
+.container { padding: 24px; max-width: 980px; margin: 0 auto; }

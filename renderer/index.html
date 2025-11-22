@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>FlowPilot – AI Flow Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Font -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- TensorFlow + BlazeFace for webcam face detection -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.21.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface"></script>
+
+    <style>
+      :root {
+        --bg: #020617;
+        --panel-border: rgba(148, 163, 184, 0.18);
+        --text: #e5e7eb;
+        --text-dim: #9ca3af;
+        --accent-sky: #38bdf8;
+        --accent-emerald: #22c55e;
+        --accent-amber: #fbbf24;
+        --accent-red: #fb7185;
+        --card-radius: 18px;
+        --shadow-soft: 0 18px 40px rgba(15, 23, 42, 0.65);
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        background: radial-gradient(circle at top, #020617 0, #020617 55%, #000 100%);
+        color: var(--text);
+        min-height: 100vh;
+      }
+
+      .page {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .shell {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 16px 16px 72px;
+      }
+
+      /* TOP NAVBAR */
+
+      .navbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+      }
+
+      .nav-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .logo-text {
+        font-size: 26px;
+        font-weight: 700;
+      }
+
+      .badge-pika {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 11px;
+        color: #e0f2fe;
+        background: radial-gradient(circle at top left, #38bdf8, #0f172a);
+        border: 1px solid rgba(56, 189, 248, 0.5);
+      }
+
+      .badge-pika span:first-child {
+        font-size: 12px;
+      }
+
+      .nav-right {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .nav-link {
+        font-size: 13px;
+        color: var(--text-dim);
+        cursor: pointer;
+      }
+
+      .btn-outline {
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.3);
+        background: rgba(15, 23, 42, 0.85);
+        padding: 6px 14px;
+        font-size: 13px;
+        cursor: pointer;
+        color: var(--text);
+      }
+
+      .btn-primary {
+        border-radius: 999px;
+        border: none;
+        background: linear-gradient(to right, #38bdf8, #0ea5e9);
+        padding: 7px 18px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        color: #0b1120;
+        box-shadow: 0 10px 22px rgba(56, 189, 248, 0.45);
+      }
+
+      /* GRID LAYOUT */
+
+      .grid {
+        display: grid;
+        gap: 16px;
+      }
+
+      .grid-4 {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .grid-2 {
+        grid-template-columns: 2.2fr 1.4fr;
+      }
+
+      .grid-2-bottom {
+        grid-template-columns: 2fr 1.6fr;
+      }
+
+      @media (max-width: 1024px) {
+        .grid-4 {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .grid-2,
+        .grid-2-bottom {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+
+      @media (max-width: 640px) {
+        .shell {
+          padding: 8px 10px 80px;
+        }
+        .navbar {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 8px;
+        }
+        .grid-4 {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+
+      /* CARD BASE */
+
+      .card {
+        background: radial-gradient(circle at top left, #020617, #020617 45%, #020617 100%);
+        border-radius: var(--card-radius);
+        border: 1px solid var(--panel-border);
+        box-shadow: var(--shadow-soft);
+        padding: 18px 18px 16px;
+      }
+
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+      }
+
+      .card-title {
+        font-size: 14px;
+        font-weight: 500;
+      }
+
+      .card-subtitle {
+        font-size: 11px;
+        color: var(--text-dim);
+      }
+
+      .card-main {
+        margin-top: 8px;
+      }
+
+      /* STAT CARDS */
+
+      .stat-main {
+        font-size: 28px;
+        font-weight: 700;
+        margin-bottom: 2px;
+      }
+
+      .stat-label {
+        font-size: 11px;
+        color: var(--text-dim);
+      }
+
+      .stat-change {
+        font-size: 11px;
+        margin-top: 4px;
+      }
+
+      .stat-change.pos {
+        color: var(--accent-emerald);
+      }
+
+      .stat-change.neg {
+        color: var(--accent-amber);
+      }
+
+      /* FOCUS TIMELINE */
+
+      .focus-card {
+        padding-bottom: 18px;
+      }
+
+      .chart-container {
+        margin-top: 12px;
+      }
+
+      canvas {
+        width: 100% !important;
+        height: 260px !important;
+      }
+
+      /* HEATMAP */
+
+      .heatmap-legend {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        color: var(--text-dim);
+        margin-bottom: 6px;
+      }
+
+      .legend-swatch {
+        width: 12px;
+        height: 8px;
+        border-radius: 999px;
+      }
+
+      .heatmap-grid {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 6px;
+        margin-top: 10px;
+      }
+
+      .heatmap-labels {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        margin-top: 4px;
+        font-size: 11px;
+        color: var(--text-dim);
+        text-align: center;
+      }
+
+      .heat-cell {
+        height: 14px;
+        border-radius: 999px;
+        background: #020617;
+        border: 1px solid rgba(15, 23, 42, 0.9);
+      }
+
+      /* INSIGHTS & MOOD */
+
+      .insights-list {
+        margin-top: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 13px;
+      }
+
+      .insights-item {
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+      }
+
+      .insights-dot {
+        margin-top: 4px;
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--accent-emerald);
+      }
+
+      .insights-text {
+        color: var(--text);
+      }
+
+      .pill-section {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 18px;
+      }
+
+      @media (max-width: 640px) {
+        .pill-section {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+
+      .pill-card {
+        background: radial-gradient(circle at top left, #020617, #020617);
+        border-radius: 16px;
+        border: 1px solid var(--panel-border);
+        padding: 12px 14px 10px;
+      }
+
+      .pill-title {
+        font-size: 12px;
+        color: var(--text-dim);
+        margin-bottom: 4px;
+      }
+
+      .pill-value {
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .evo-bar-outer {
+        margin-top: 8px;
+        width: 100%;
+        height: 10px;
+        background: #020617;
+        border-radius: 999px;
+        overflow: hidden;
+      }
+
+      .evo-bar-inner {
+        height: 100%;
+        background: linear-gradient(to right, #38bdf8, #0ea5e9);
+      }
+
+      /* MOOD + PIKA BUBBLE + WEBCAM PREVIEW */
+
+      .mood-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+      }
+
+      .mood-circle {
+        width: 160px;
+        height: 160px;
+        border-radius: 999px;
+        background: radial-gradient(circle at top, #1e293b, #020617);
+        border: 2px solid rgba(56, 189, 248, 0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+      }
+
+      .mood-arc {
+        position: absolute;
+        inset: 10px;
+        border-radius: 999px;
+        border: 6px solid transparent;
+        border-top-color: #38bdf8;
+        border-right-color: #22c55e;
+        opacity: 0.9;
+        transform: rotate(-40deg);
+      }
+
+      .mood-face {
+        font-size: 48px;
+      }
+
+      .mood-caption {
+        font-size: 13px;
+        text-align: center;
+      }
+
+      .mood-score {
+        font-size: 12px;
+        color: var(--text-dim);
+      }
+
+      .pika-bubble {
+        margin-top: 6px;
+        font-size: 12px;
+        color: #e5e7eb;
+        background: rgba(15, 23, 42, 0.9);
+        border-radius: 12px;
+        padding: 8px 10px;
+        border: 1px solid rgba(56, 189, 248, 0.35);
+        max-width: 260px;
+        text-align: center;
+      }
+
+      .webcam-wrap {
+        margin-top: 6px;
+        width: 140px;
+        height: 80px;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid rgba(148, 163, 184, 0.3);
+        position: relative;
+        background: #020617;
+      }
+
+      .webcam-wrap span {
+        position: absolute;
+        top: 4px;
+        left: 6px;
+        font-size: 10px;
+        color: var(--text-dim);
+        background: rgba(15, 23, 42, 0.7);
+        padding: 2px 6px;
+        border-radius: 999px;
+      }
+
+      #webcam {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      /* BOTTOM BAR */
+
+      .bottom-bar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #020617;
+        border-top: 1px solid rgba(15, 23, 42, 0.95);
+        padding: 8px 12px;
+        z-index: 40;
+      }
+
+      .bottom-inner {
+        max-width: 1200px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      @media (max-width: 640px) {
+        .bottom-inner {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+
+      .bottom-btn {
+        border-radius: 999px;
+        border: none;
+        font-size: 14px;
+        font-weight: 600;
+        padding: 10px 14px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        transition: all 0.2s ease;
+      }
+
+      .bottom-btn.start {
+        background: #facc15;
+        color: #020617;
+      }
+
+      .bottom-btn.flow {
+        background: #22c55e;
+        color: #022c22;
+      }
+
+      .bottom-btn.break {
+        background: #a855f7;
+        color: #020617;
+      }
+
+      .bottom-btn.start.running {
+        background: linear-gradient(90deg, #22c55e, #38bdf8);
+        color: #020617;
+        box-shadow: 0 0 18px rgba(56, 189, 248, 0.9);
+        position: relative;
+      }
+
+      .bottom-btn.start.running::after {
+        content: "⚡";
+        position: absolute;
+        right: 14px;
+        animation: pulse 1s infinite;
+      }
+
+      @keyframes pulse {
+        0% {
+          transform: scale(1);
+          opacity: 0.7;
+        }
+        50% {
+          transform: scale(1.2);
+          opacity: 1;
+        }
+        100% {
+          transform: scale(1);
+          opacity: 0.7;
+        }
+      }
+
+      .start-label-main {
+        font-weight: 700;
+      }
+
+      .start-label-sub {
+        font-size: 11px;
+        opacity: 0.9;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="shell">
+        <!-- NAVBAR -->
+        <header class="navbar">
+          <div class="nav-left">
+            <div class="logo-text">FlowPilot</div>
+            <div class="badge-pika">
+              <span>⚡</span>
+              <span>Powered by Pika AI</span>
+            </div>
+          </div>
+          <div class="nav-right">
+            <div class="nav-link">Docs</div>
+            <button class="btn-outline">Log In</button>
+            <button class="btn-primary">Sign Up</button>
+          </div>
+        </header>
+
+        <!-- TOP STATS -->
+        <section class="grid grid-4" style="margin-top: 8px">
+          <article class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Today's Flow Score</div>
+              </div>
+              <div>⚡</div>
+            </div>
+            <div class="card-main">
+              <div>
+                <span id="flow-score-value" class="stat-main">--</span>
+              </div>
+              <div class="stat-label">Average Flow State</div>
+              <div id="flow-score-change" class="stat-change pos"></div>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-header">
+              <div class="card-title">Deep Focus Time</div>
+              <div>⚡</div>
+            </div>
+            <div class="card-main">
+              <div>
+                <span id="deep-focus-hours" class="stat-main">--</span>
+              </div>
+              <div class="stat-label">Deep Work Achieved</div>
+              <div id="deep-focus-change" class="stat-change pos"></div>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-header">
+              <div class="card-title">Distraction Events</div>
+              <div>⚠️</div>
+            </div>
+            <div class="card-main">
+              <div class="stat-main" id="disruptions-value">--</div>
+              <div class="stat-label">Tab switches / inactivity</div>
+              <div
+                id="disruptions-change"
+                class="stat-change"
+                style="color: var(--accent-emerald)"
+              ></div>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-header">
+              <div class="card-title">Productivity Stamina</div>
+              <div>🔋</div>
+            </div>
+            <div class="card-main">
+              <div class="stat-main" id="stamina-level">--</div>
+              <div class="stat-label">Cognitive endurance</div>
+              <div
+                id="stamina-trend"
+                class="stat-change"
+                style="color: var(--accent-emerald)"
+              ></div>
+            </div>
+          </article>
+        </section>
+
+        <!-- MID ROW: FOCUS + HEATMAP -->
+        <section class="grid grid-2" style="margin-top: 18px">
+          <article class="card focus-card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Focus Timeline</div>
+                <div class="card-subtitle">
+                  Your flow score throughout the day
+                </div>
+              </div>
+            </div>
+            <div class="chart-container">
+              <canvas id="focusTimelineChart"></canvas>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Distraction Hotspots</div>
+                <div class="card-subtitle">
+                  When you get distracted the most
+                </div>
+              </div>
+            </div>
+            <div class="heatmap-legend">
+              <span>Less</span>
+              <span class="legend-swatch" style="background:#16a34a"></span>
+              <span class="legend-swatch" style="background:#facc15"></span>
+              <span class="legend-swatch" style="background:#f97316"></span>
+              <span>More</span>
+            </div>
+            <div id="heatmapGrid" class="heatmap-grid"></div>
+            <div class="heatmap-labels" id="heatmapLabels"></div>
+          </article>
+        </section>
+
+        <!-- BOTTOM ROW: INSIGHTS + MOOD + PIKA + WEBCAM -->
+        <section class="grid grid-2-bottom" style="margin-top: 18px">
+          <article class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Daily Pika Insights</div>
+                <div class="card-subtitle">
+                  Your personalized productivity analysis for today.
+                </div>
+              </div>
+            </div>
+            <div id="insightsList" class="insights-list"></div>
+
+            <div class="pill-section">
+              <div class="pill-card">
+                <div class="pill-title">Current Mood Status</div>
+                <div id="mood-status" class="pill-value">--</div>
+              </div>
+              <div class="pill-card">
+                <div class="pill-title">Evolution Progress</div>
+                <div class="pill-value">
+                  <span id="evo-current">0</span> /
+                  <span id="evo-goal">0</span> mins
+                </div>
+                <div class="evo-bar-outer">
+                  <div id="evo-bar" class="evo-bar-inner" style="width:0%"></div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="mood-wrapper">
+              <div class="mood-circle">
+                <div class="mood-arc"></div>
+                <div id="mood-face" class="mood-face">⚡</div>
+              </div>
+              <div class="mood-caption">
+                Pika feels your energy today!
+                <div id="mood-score" class="mood-score">Flow Score: --%</div>
+              </div>
+
+              <div id="pikaBubble" class="pika-bubble">
+                Pika: “Start FlowPilot and I’ll guard your focus ⚡”
+              </div>
+
+              <div class="webcam-wrap">
+                <span id="webcamStatus">Webcam idle</span>
+                <video id="webcam" autoplay playsinline muted></video>
+              </div>
+            </div>
+          </article>
+        </section>
+      </div>
+
+      <!-- BOTTOM ACTION BAR -->
+      <!-- BOTTOM ACTION BAR (REPLACED: includes Stop + Chat) -->
+<footer class="bottom-bar">
+  <div class="bottom-inner" style="align-items:center; gap:12px;">
+    <!-- Chat input -->
+    <div style="display:flex; align-items:center; gap:10px;">
+      <input id="chatInput" type="text" placeholder="Chat with Pika (try: 'Hi Pika')" style="min-width:320px; padding:10px 12px; border-radius:12px; border:1px solid rgba(148,163,184,0.15); background:#061122; color:var(--text); font-size:14px;" />
+      <button id="chatSend" class="bottom-btn start" style="padding:8px 12px; font-size:13px;">💬 Send</button>
+    </div>
+
+    <!-- Action buttons -->
+    <div style="display:flex; gap:10px; margin-left:auto;">
+      <button id="startFlow" class="bottom-btn start">
+        <div class="start-label">
+          <span class="start-label-main" id="startFlowText">▶ Start FlowPilot</span>
+          <span class="start-label-sub" id="startFlowSub">Pika will track your flow</span>
+        </div>
+      </button>
+
+      <button id="stopFlow" class="bottom-btn flow" style="background:#ef4444; color:#fff;">
+        ⏹ Stop
+      </button>
+
+      <button id="flowAmplify" class="bottom-btn flow">
+        🚀 Flow Amplify Mode
+      </button>
+
+      <button id="microBreak" class="bottom-btn break">
+        ☕ Micro-break
+      </button>
+    </div>
+  </div>
+</footer>
+
+    </div>
+
+    <!-- FIREBASE + DASHBOARD LOGIC -->
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+      import {
+        getFirestore,
+        doc,
+        setDoc,
+        onSnapshot,
+      } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+      // ===== CONFIG =====
+      const firebaseConfig = {
+        apiKey: "AIzaSyBYBRNkZ8YihzYCopyOd4u0jD36KzJjpiw",
+        authDomain: "flowpilot-81898.firebaseapp.com",
+        projectId: "flowpilot-81898",
+        storageBucket: "flowpilot-81898.firebasestorage.app",
+        messagingSenderId: "1046249317534",
+        appId: "1:1046249317534:web:503cfb0682ad8d6c6ac78f",
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+
+      // ===== HELPERS =====
+      function formatDeepFocus(minutes) {
+        const h = Math.floor(minutes / 60);
+        const m = minutes % 60;
+        return { h, m };
+      }
+
+      function heatColor(level) {
+        if (level <= 0) return "#020617";
+        if (level === 1) return "#16a34a";
+        if (level === 2) return "#facc15";
+        return "#f97316";
+      }
+
+      function reshapeHeatmap(arr, rows = 7, cols = 8) {
+        const result = [];
+        for (let r = 0; r < rows; r++) {
+          result.push(arr.slice(r * cols, r * cols + cols));
+        }
+        return result;
+      }
+
+      function updatePikaMessage(text) {
+        const bubble = document.getElementById("pikaBubble");
+        if (bubble) bubble.textContent = `Pika: “${text}”`;
+      }
+
+      function playPikaSound() {
+        try {
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.frequency.value = 880;
+          osc.type = "triangle";
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          gain.gain.value = 0.08;
+          osc.start();
+          setTimeout(() => {
+            osc.stop();
+            ctx.close();
+          }, 200);
+        } catch (e) {
+          console.warn("Sound blocked / not supported", e);
+        }
+      }
+      // ------------------ Chat proxy helper ------------------
+      // Use this to send chat messages to local api-server which proxies to Gemini/OpenAI.
+      // Expects `messages` array: [{ role: 'user'|'assistant'|'system', content: '...' }, ...]
+      async function sendChatToServer(messages) {
+        try {
+          const resp = await fetch('http://localhost:5000/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messages })
+          });
+
+          if (!resp.ok) {
+            const txt = await resp.text();
+            console.error('Chat proxy HTTP error', resp.status, txt);
+            return { error: 'http', status: resp.status, body: txt };
+          }
+
+          const data = await resp.json();
+          // The proxy returns Gemini/OpenAI full response; normalize as needed.
+          // Example if using OpenAI Chat Completions:
+          // data.choices[0].message.content
+          return data;
+        } catch (e) {
+          console.error('sendChatToServer error', e);
+          return { error: 'network', message: e.message || String(e) };
+        }
+      }
+
+            // ---------- Start / Stop integration + Chat send handler ----------
+
+      // STOP function: reverses startFlowPilotTracking effects
+      function stopFlowPilotTracking() {
+        if (!flowPilotRunning && !trackingInterval) {
+          return;
+        }
+
+        // stop the tracking loop
+        if (trackingInterval) {
+          clearInterval(trackingInterval);
+          trackingInterval = null;
+        }
+
+        // stop webcam loop flag (webcamStarted remains true if camera active)
+        flowPilotRunning = false;
+
+        // UI reset
+        const btn = document.getElementById("startFlow");
+        const label = document.getElementById("startFlowText");
+        const sub = document.getElementById("startFlowSub");
+
+        if (btn) {
+          btn.classList.remove("running");
+          btn.disabled = false;
+        }
+        if (label) label.textContent = "▶ Start FlowPilot";
+        if (sub) sub.textContent = "Pika will track your flow";
+
+        updatePikaMessage("FlowPilot paused. Take a short break if needed!");
+        console.log("FlowPilot tracking stopped.");
+      }
+
+      // Wire Start/Stop buttons and chat send after DOM loaded
+      document.addEventListener("DOMContentLoaded", () => {
+        // Ensure existing start wiring still works: replace with electronAPI if present
+        const startBtn = document.getElementById("startFlow");
+        if (startBtn) {
+          // remove existing duplicate listener if any (safe)
+          startBtn.replaceWith(startBtn.cloneNode(true));
+        }
+
+        // reselect after replace
+        const startBtn2 = document.getElementById("startFlow");
+        if (startBtn2) {
+          startBtn2.addEventListener("click", () => {
+            // call existing startFlowPilotTracking() which you have above
+            if (typeof startFlowPilotTracking === "function") {
+              startFlowPilotTracking();
+            }
+            // if Electron main available, also inform it
+            if (window.electronAPI && window.electronAPI.startTracking) {
+              window.electronAPI.startTracking();
+            }
+          });
+        }
+
+        // Stop button wiring
+        const stopBtn = document.getElementById("stopFlow");
+        if (stopBtn) {
+          stopBtn.addEventListener("click", () => {
+            stopFlowPilotTracking();
+            if (window.electronAPI && window.electronAPI.stopTracking) {
+              window.electronAPI.stopTracking();
+            }
+            stopBtn.disabled = true;
+            // re-enable start after short delay to avoid accidental double clicks
+            setTimeout(() => {
+              stopBtn.disabled = false;
+            }, 800);
+          });
+        }
+
+        // Chat send wiring
+        const chatInput = document.getElementById("chatInput");
+        const chatSend = document.getElementById("chatSend");
+
+        // Create a minimal chat log UI (floating) so you can see bot replies
+        let chatLog = document.getElementById("pikaChatLog");
+        if (!chatLog) {
+          chatLog = document.createElement("div");
+          chatLog.id = "pikaChatLog";
+          chatLog.style.position = "fixed";
+          chatLog.style.right = "18px";
+          chatLog.style.bottom = "92px";
+          chatLog.style.maxWidth = "360px";
+          chatLog.style.background = "rgba(2,6,23,0.9)";
+          chatLog.style.border = "1px solid rgba(148,163,184,0.08)";
+          chatLog.style.borderRadius = "12px";
+          chatLog.style.padding = "10px";
+          chatLog.style.color = "var(--text)";
+          chatLog.style.zIndex = 9999;
+          chatLog.style.boxShadow = "0 10px 24px rgba(2,6,23,0.7)";
+          chatLog.innerHTML = `<div style="font-weight:600; margin-bottom:6px;">Pika • Chat</div>`;
+          document.body.appendChild(chatLog);
+        }
+
+        function appendChatMessage(who, text) {
+          const wrapper = document.createElement("div");
+          wrapper.style.marginTop = "8px";
+          wrapper.style.fontSize = "13px";
+          if (who === "user") {
+            wrapper.innerHTML = `<div style="text-align:right; color:#c7f9ff;">You</div><div style="background:#071627; padding:8px; border-radius:8px; margin-top:4px;">${text}</div>`;
+          } else {
+            wrapper.innerHTML = `<div style="text-align:left; color:#a7f3d0;">Pika</div><div style="background:#041826; padding:8px; border-radius:8px; margin-top:4px;">${text}</div>`;
+          }
+          chatLog.appendChild(wrapper);
+          // auto-scroll
+          chatLog.scrollTop = chatLog.scrollHeight;
+        }
+
+        // chatSend click or Enter in input
+        if (chatSend && chatInput) {
+          const sendChat = async () => {
+            const text = chatInput.value && chatInput.value.trim();
+            if (!text) return;
+            // show user message
+            appendChatMessage("user", text);
+            chatInput.value = "";
+
+            // call proxy
+            appendChatMessage("user", "<i>Sending to Pika...</i>");
+            try {
+              const resp = await sendChatToServer(text);
+              // clear placeholder "sending" line
+              // find last <i>Sending... </i> and remove (simple)
+              const sending = Array.from(chatLog.querySelectorAll("div")).reverse().find(d => d.innerHTML.includes("Sending to Pika"));
+              if (sending) sending.remove();
+
+              const reply = (typeof extractAssistantText === "function") ? extractAssistantText(resp) : JSON.stringify(resp).slice(0,400);
+              appendChatMessage("assistant", reply || "No reply");
+            } catch (e) {
+              appendChatMessage("assistant", "Error contacting Pika");
+              console.error(e);
+            }
+          };
+
+          chatSend.addEventListener("click", sendChat);
+          chatInput.addEventListener("keydown", (ev) => {
+            if (ev.key === "Enter") {
+              ev.preventDefault();
+              sendChat();
+            }
+          });
+        }
+      });
+
+
+      // ===== REALTIME DASHBOARD =====
+      let focusChart = null;
+
+      function renderDashboard(data) {
+        if (!data) return;
+
+        document.getElementById("flow-score-value").textContent =
+          data.flowScore ?? "--";
+        document.getElementById("flow-score-change").textContent =
+          data.flowScoreChange ?? "";
+
+        const { h, m } = formatDeepFocus(data.deepFocusMinutes || 0);
+        document.getElementById("deep-focus-hours").textContent =
+          h > 0 ? `${h} hr ${m} min` : `${m} min`;
+        document.getElementById("deep-focus-change").textContent =
+          data.deepFocusChange ?? "";
+
+        document.getElementById("disruptions-value").textContent =
+          data.disruptions ?? 0;
+        document.getElementById("disruptions-change").textContent =
+          `${data.disruptions ?? 0} total`;
+
+        document.getElementById("stamina-level").textContent =
+          data.staminaLevel ?? "—";
+        document.getElementById("stamina-trend").textContent =
+          data.staminaTrend ?? "";
+
+        const labels =
+          data.hourlyFocus?.length === 12
+            ? [
+                "12am",
+                "2am",
+                "4am",
+                "6am",
+                "8am",
+                "10am",
+                "12pm",
+                "2pm",
+                "4pm",
+                "6pm",
+                "8pm",
+                "10pm",
+              ]
+            : data.hourlyFocus?.map((_, i) => `${i}:00`);
+
+        const chartData = data.hourlyFocus || [];
+        const ctx = document
+          .getElementById("focusTimelineChart")
+          .getContext("2d");
+
+        if (!focusChart) {
+          focusChart = new Chart(ctx, {
+            type: "line",
+            data: {
+              labels,
+              datasets: [
+                {
+                  label: "Flow Score",
+                  data: chartData,
+                  tension: 0.4,
+                  fill: true,
+                  backgroundColor: "rgba(56, 189, 248, 0.25)",
+                  borderColor: "rgba(56, 189, 248, 0.9)",
+                  borderWidth: 2,
+                  pointRadius: 0,
+                },
+              ],
+            },
+            options: {
+              plugins: { legend: { display: false } },
+              scales: {
+                x: {
+                  grid: { color: "rgba(148, 163, 184, 0.15)" },
+                  ticks: { color: "#9ca3af", font: { size: 10 } },
+                },
+                y: {
+                  grid: { color: "rgba(148, 163, 184, 0.12)" },
+                  ticks: { color: "#9ca3af", font: { size: 10 } },
+                  min: 0,
+                  max: 100,
+                },
+              },
+            },
+          });
+        } else {
+          focusChart.data.labels = labels;
+          focusChart.data.datasets[0].data = chartData;
+          focusChart.update();
+        }
+
+        // HEATMAP
+        const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        const heatmapGrid = document.getElementById("heatmapGrid");
+        const labelsDiv = document.getElementById("heatmapLabels");
+        heatmapGrid.innerHTML = "";
+        labelsDiv.innerHTML = "";
+
+        let matrix = data.heatmap || [];
+        if (matrix.length && !Array.isArray(matrix[0])) {
+          matrix = reshapeHeatmap(matrix);
+        }
+
+        let maxRows = 0;
+        matrix.forEach((row) => {
+          if (Array.isArray(row) && row.length > maxRows) maxRows = row.length;
+        });
+
+        for (let col = 0; col < days.length; col++) {
+          const colData = matrix[col] || [];
+          for (let row = 0; row < maxRows; row++) {
+            const level = colData[row] ?? 0;
+            const cell = document.createElement("div");
+            cell.className = "heat-cell";
+            cell.style.backgroundColor = heatColor(level);
+            heatmapGrid.appendChild(cell);
+          }
+        }
+
+        days.forEach((d) => {
+          const span = document.createElement("div");
+          span.textContent = d;
+          labelsDiv.appendChild(span);
+        });
+
+        // INSIGHTS
+        const insightsList = document.getElementById("insightsList");
+        insightsList.innerHTML = "";
+        (data.pikaInsights || []).forEach((text) => {
+          const row = document.createElement("div");
+          row.className = "insights-item";
+          const dot = document.createElement("div");
+          dot.className = "insights-dot";
+          const txt = document.createElement("div");
+          txt.className = "insights-text";
+          txt.textContent = text;
+          row.appendChild(dot);
+          row.appendChild(txt);
+          insightsList.appendChild(row);
+        });
+
+        // MOOD + EVOLUTION
+        document.getElementById("mood-status").textContent =
+          data.moodStatus ?? "In Flow";
+
+        document.getElementById("evo-current").textContent =
+          data.evolutionCurrent ?? 0;
+        document.getElementById("evo-goal").textContent =
+          data.evolutionGoal ?? 0;
+
+        const percent =
+          data.evolutionGoal > 0
+            ? Math.min(
+                100,
+                (data.evolutionCurrent / data.evolutionGoal) * 100
+              )
+            : 0;
+        document.getElementById("evo-bar").style.width = percent + "%";
+
+        const faceEl = document.getElementById("mood-face");
+        const score = data.flowScore ?? 0;
+        let face = "🙂";
+        if (score >= 80) face = "⚡";
+        else if (score <= 40) face = "😴";
+        else if (score <= 60) face = "😐";
+        faceEl.textContent = face;
+
+        document.getElementById(
+          "mood-score"
+        ).textContent = `Flow Score: ${score}%`;
+      }
+
+      function subscribeDashboardRealtime() {
+        const ref = doc(db, "analytics", "today");
+        onSnapshot(ref, (snap) => {
+          if (!snap.exists()) {
+            console.error("analytics/today not found");
+            return;
+          }
+          const data = snap.data();
+          console.log("Realtime dashboard data:", data);
+          renderDashboard(data);
+        });
+      }
+
+      // ===== TRACKING + WEBCAM =====
+      let trackingInterval = null;
+      let flowPilotRunning = false;
+      let lastActivity = Date.now();
+      let focusMinutes = 0;
+      let disruptions = 0;
+      let hourlyFocus = Array(12).fill(0);
+      let lastDistractionAt = 0;
+      let faceModel = null;
+      let webcamStarted = false;
+
+      function registerDistraction(reason = "") {
+        const now = Date.now();
+        if (now - lastDistractionAt < 15000) return; // 15 sec cooldown
+        lastDistractionAt = now;
+        disruptions += 1;
+        console.log("❌ Distraction detected:", reason);
+        updatePikaMessage("Arre, dhyaan idhar! 2 min ka deep-focus try karein?");
+        playPikaSound();
+      }
+
+      async function startWebcamIfNeeded() {
+        if (webcamStarted) return;
+        webcamStarted = true;
+
+        const video = document.getElementById("webcam");
+        const label = document.getElementById("webcamStatus");
+
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: 320, height: 180 },
+            audio: false,
+          });
+          video.srcObject = stream;
+          label.textContent = "Webcam active";
+          label.style.color = "#22c55e";
+
+          // load face model
+          if (window.blazeface) {
+            faceModel = await window.blazeface.load();
+            console.log("BlazeFace model loaded");
+            analyzeWebcamLoop();
+          } else {
+            console.warn("BlazeFace model not available");
+          }
+        } catch (e) {
+          console.error("Webcam permission denied or error", e);
+          label.textContent = "Webcam blocked";
+          label.style.color = "#f97316";
+        }
+      }
+
+      async function analyzeWebcamLoop() {
+        if (!faceModel || !webcamStarted) return;
+        const video = document.getElementById("webcam");
+        if (video.readyState < 2) {
+          requestAnimationFrame(analyzeWebcamLoop);
+          return;
+        }
+
+        try {
+          const predictions = await faceModel.estimateFaces(video, false);
+          if (!predictions || predictions.length === 0) {
+            registerDistraction("No face detected");
+          } else {
+            // face present → treat as focused, no special action
+          }
+        } catch (e) {
+          console.warn("Face estimation error", e);
+        }
+
+        requestAnimationFrame(analyzeWebcamLoop);
+      }
+
+      function startFlowPilotTracking() {
+        if (flowPilotRunning) return;
+        flowPilotRunning = true;
+
+        console.log("FlowPilot tracking started...");
+        updatePikaMessage("Nice! Main ab tumhara focus guard kar raha hoon ⚡");
+
+        const btn = document.getElementById("startFlow");
+        const label = document.getElementById("startFlowText");
+        const sub = document.getElementById("startFlowSub");
+
+        btn.classList.add("running");
+        btn.disabled = true;
+        label.textContent = "FlowPilot Running";
+        sub.textContent = "Pika is watching your focus ⚡";
+
+        window.addEventListener("mousemove", () => (lastActivity = Date.now()));
+        window.addEventListener("keydown", () => (lastActivity = Date.now()));
+
+        // tab switch / window blur = distraction
+        document.addEventListener("visibilitychange", () => {
+          if (document.hidden) {
+            registerDistraction("Tab switched / hidden");
+            startWebcamIfNeeded();
+          }
+        });
+
+        window.addEventListener("blur", () => {
+          registerDistraction("Window lost focus");
+          startWebcamIfNeeded();
+        });
+
+        if (trackingInterval) clearInterval(trackingInterval);
+
+        trackingInterval = setInterval(() => {
+          const now = Date.now();
+          const idleTime = now - lastActivity;
+
+          if (idleTime < 60000) {
+            focusMinutes += 1;
+          } else {
+            registerDistraction("Idle > 60s");
+          }
+
+          const hourIndex = Math.floor(new Date().getHours() / 2);
+          if (hourIndex >= 0 && hourIndex < hourlyFocus.length) {
+            hourlyFocus[hourIndex] = Math.min(
+              100,
+              hourlyFocus[hourIndex] + 5
+            );
+          }
+
+          const randomScore = Math.floor(Math.random() * 30) + 70;
+
+          setDoc(
+            doc(db, "analytics", "today"),
+            {
+              flowScore: randomScore,
+              deepFocusMinutes: focusMinutes,
+              disruptions: disruptions,
+              hourlyFocus: hourlyFocus,
+              flowScoreChange: "+ live",
+              staminaLevel: "High",
+              staminaTrend: "Stable",
+            },
+            { merge: true }
+          ).then(() => {
+            console.log("🔥 Firestore updated from tracking");
+          });
+        }, 60000);
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        subscribeDashboardRealtime();
+
+        const btn = document.getElementById("startFlow");
+        if (!btn) {
+          console.error("Start FlowPilot button not found");
+          return;
+        }
+
+        btn.addEventListener("click", () => {
+          startFlowPilotTracking();
+        });
+      });
+    </script>
+  </body>
+</html>
